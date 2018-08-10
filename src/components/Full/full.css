@@ -1,0 +1,16 @@
+.app{
+	height: 100vh;
+}
+
+.app-body{
+	padding-top: 55px;
+	position: relative;
+}
+
+.main-div{
+	margin-left: 200px;
+}
+
+.main-div-inner{
+	padding: 25px 20px 80px 20px;
+}
