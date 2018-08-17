@@ -6,11 +6,12 @@ import { ToastContainer ,toast} from 'react-toastify';
 
 import './full.css';
 import Header from '../Header/Header.js';
-import SideBar from '../SideBar/SideBar.js';
 import Footer from '../Footer/Footer.js';
-import Dashboard from '../Dashboard/Dashboard';
-import AddUserPage from '../AddUserPage/AddUserPage';
+import Home from '../Home/Home';
+import TicTacToe from '../../games/tic-tac-toe/index.js';
+import utils from '../../utils/utils.js';
 
+const generateGameID = utils.generateGameID;
 
 class Full extends Component {
   render() {
@@ -21,13 +22,16 @@ class Full extends Component {
         />
         <Header />
         <div className="app-body">
-          <SideBar />
           <div className="main-div">
             <Container fluid className='main-div-inner'>
               <Switch>
-                <Route path='/dashboard' component={Dashboard} />
-                <Route path='/users/add' component={AddUserPage} />
-                <Redirect from='/' to='/dashboard' />
+                <Route path='/home' component={Home} />
+                <Route path='/tic-tac-toe/:gameID' component={TicTacToe}/>
+
+
+                <Redirect from='/tic-tac-toe' to={'/tic-tac-toe/'+generateGameID('tic')}/>
+                <Redirect from='/' to='/home' />
+
               </Switch>
             </Container>
           </div>

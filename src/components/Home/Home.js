@@ -1,14 +1,14 @@
 import React, {Component} from 'react';
 
 
-class Dashboard extends Component {
+class Home extends Component {
   render() {
     return (
     	<div>
-      		classrsiap ar dashboard
+      		Ryuk game Home page
       	</div>
     )
   }
 }
 
-export default Dashboard;
+export default Home;

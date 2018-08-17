@@ -5,6 +5,7 @@ import './index.css';
 import 'bootstrap/dist/css/bootstrap.css';
 import 'font-awesome/css/font-awesome.min.css';
 import 'simple-line-icons/css/simple-line-icons.css';
+import 'react-toastify/dist/ReactToastify.css';
 
 import App from './App.js';
 

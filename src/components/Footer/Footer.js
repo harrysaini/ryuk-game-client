@@ -5,7 +5,7 @@ class Footer extends Component {
   render() {
     return (
       <footer className="app-footer text-center">
-        <span>&copy; crisp-ar 2018</span>
+        <span>&copy; ryuk-game 2018</span>
       </footer>
     )
   }
