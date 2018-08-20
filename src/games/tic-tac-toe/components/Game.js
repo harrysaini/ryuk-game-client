@@ -4,6 +4,8 @@ import {ScoreBoard} from './ScoreBoard';
 import {Board} from './Board';
 import { Result } from './Result';
 import { ResetButton } from './ResetButton';
+import { WaitingMsg } from './WaitingMsg';
+
 
 
 export class Game extends React.Component{
@@ -13,7 +15,8 @@ export class Game extends React.Component{
 		var resultDivJSX , 
 			scoreBoardJSX,
 			turnDisplayerJSX,
-			resetBtnJSX;
+			resetBtnJSX,
+			waitingMsgJsx;
 
 		scoreBoardJSX = (
 			<ScoreBoard 
@@ -26,7 +29,8 @@ export class Game extends React.Component{
 		turnDisplayerJSX = (
 			<TurnDisplayer
 				currentPlayer = {this.props.currentPlayer}
-				gameType = {this.props.gameType}
+				userPlayer = {this.props.userPlayer}
+				playerSymbol = {this.props.currentPlayer === 'playerOne' ? this.props.playerOneSymbol : this.props.playerTwoSymbol }		
 			/>
 			);
 		resetBtnJSX = (
@@ -35,6 +39,14 @@ export class Game extends React.Component{
 			/>
 			);
 
+
+		if(this.props.waiting || this.props.paused){
+			waitingMsgJsx = (
+				<WaitingMsg
+					msg = { this.props.waiting ? 'Wating for opponent' : 'Game paused' }
+				/>
+				);
+		}
 		
 
 		if(this.props.isFinished===true){
@@ -43,15 +55,15 @@ export class Game extends React.Component{
 			<Result
 				isTied = {this.props.isTied}
 				winner = {this.props.winner}
-				gameType = {this.props.gameType}
+				userPlayer = {this.props.userPlayer}
 			/>
 			);
 
 			return (
 				<div className="game-box-inner">
-					{resetBtnJSX}
 					{resultDivJSX}
 					{scoreBoardJSX}
+					{waitingMsgJsx}
 					<Board 
 						isFinished={true}
 						isTied={this.props.isTied}
@@ -65,12 +77,12 @@ export class Game extends React.Component{
 
 			return (
 				<div className="game-box-inner">
-					{resetBtnJSX}
 					{scoreBoardJSX}
+					{waitingMsgJsx}
 					<Board 
 						square={this.props.square} 
 						onClick={this.props.onSquareClick}
-						isAICalculating={this.props.isAICalculating}
+						pauseUserInteraction={this.props.pauseUserInteraction}
 					/>
 					{turnDisplayerJSX}
 				</div>

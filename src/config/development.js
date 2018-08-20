@@ -1,6 +1,6 @@
 var developmentVariables = {
-	apiUrl : 'http://localhost:3005/api',
-	host : 'http://localhost:3005'
+	apiUrl : 'http://'+window.location.host.split(':')[0] + ':3005' + '/api',
+	host : 'http://'+window.location.host.split(':')[0] + ':3005'
 };;
 
 

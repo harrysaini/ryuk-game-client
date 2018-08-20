@@ -1,18 +1,26 @@
 import socketIO from 'socket.io-client';
 import configVars from '../config/vars';
 
-var socket;
 const host = configVars.host;
-export function connectSocket(){
-	socket = socketIO.connect(host);
 
-	socket.on('join', function (data) {
-		console.log(data);
-		socket.emit('ok', { my: 'data' });
-	});
+export function connectSocket(namespace){
+	var socket = socketIO.connect(host + namespace || host);
+	return socket;
+}
+
+
+
+export function addSocketEventListner(socket ,event , cb){
+	socket.on(event,cb);
+}
+
+export function emitSocketEvent(socket , event , data ){
+	socket.emit(event,data);
 }
 
 
 export default {
-	connectSocket : connectSocket
+	connectSocket : connectSocket,
+	addSocketEventListner : addSocketEventListner,
+	emitSocketEvent : emitSocketEvent
 }

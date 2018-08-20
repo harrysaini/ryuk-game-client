@@ -3,11 +3,9 @@ import { withRouter } from 'react-router-dom';
 import { ToastContainer ,toast} from 'react-toastify';
 
 import { Game } from './Game';
-import { SelectGameType } from './SelectGameType';
-import { SelectGameSymbol } from './SelectGameSymbol';
 import { calculateNextMove } from '../helpers/nextMove';
 import { calculateWinner } from '../helpers/resultCalc';
-import { SelectFirstTurn } from './SelectFirstTurn';
+
 import '../helpers/protoTypeMethods';
 import utils from '../../../utils/utils';
 import gameHelpers from '../../../utils/gameHelpers';
@@ -21,38 +19,35 @@ class GameContainer extends React.Component{
 	constructor(props) {
 		super(props);
 		this.state={
-			gameState : {
-				square : [[null,null,null],[null,null,null],[null,null,null]],
-				currentSymbol : "",
-				gameState : "select-game-type",
-				isFinished : false,
-				isTied : false,
-				playerOneSymbol : "",
-				playerTwoSymbol : "",
-				playerOneScore : 0,
-				playerTwoScore : 0,
-				gameType : '',
-				currentPlayer : '',
-				winner : '',
-				winSquares : null
-			},
+			square : [[null,null,null],[null,null,null],[null,null,null]],
+			currentSymbol : "X",
+			isFinished : false,
+			isTied : false,
+			playerOneSymbol : "X",
+			playerTwoSymbol : "0",
+			playerOneScore : 0,
+			playerTwoScore : 0,
+			currentPlayer : 'playerOne',
+			winner : '',
+			winSquares : null,
 			UIState : 'game-on',
 			started : false,
-			paused : true,
-			player1 : undefined,
-			player2 : undefined
-
+			paused : false,
+			waiting:false
 		};
+
+		this.userPlayer = undefined;
+
 		this.handleSquareClick = this.handleSquareClick.bind(this);
-		this.handleGameTypeSelect = this.handleGameTypeSelect.bind(this);
-		this.handleGameSymbolSelect = this.handleGameSymbolSelect.bind(this);
-		this.handleResetClick = this.handleResetClick.bind(this);
-		this.handleFirstTurnSelect = this.handleFirstTurnSelect.bind(this);
 		
 		this.handleJoinedGame = this.handleJoinedGame.bind(this);
 		this.handleNewGame = this.handleNewGame.bind(this);
+		this.handleSocketGameUpdate = this.handleSocketGameUpdate.bind(this);
+		this.handleSocketGameStartEvent = this.handleSocketGameStartEvent.bind(this);
+		this.handleOpponentLeft = this.handleOpponentLeft.bind(this);
 
-		socketService.connectSocket();
+
+		this.socket = socketService.connectSocket('/tic-tac-toe');
 	}
 
 	getGameID(){
@@ -65,7 +60,31 @@ class GameContainer extends React.Component{
 
 	/*new code starts*/
 
-	
+
+	handleSocketGameStartEvent(data){
+		this.setState({
+			started : true,
+			waiting : false
+		});
+	}
+
+	handleSocketGameUpdate(data){
+		this.setState(data.gameState);
+	}
+
+	handleOpponentLeft(data){
+		this.setState({
+			waiting : true
+		});
+		toast.error("Opponent left");
+
+	}
+
+	initSocketEventListners(){
+		socketService.addSocketEventListner(this.socket , 'gameStart' , this.handleSocketGameStartEvent);
+		socketService.addSocketEventListner(this.socket , 'gameUpdate' , this.handleSocketGameUpdate);
+		socketService.addSocketEventListner(this.socket , 'opponentLeft' , this.handleOpponentLeft);
+	}
 
 	checkIfGameExistInServer(gameID){
 		return new Promise((resolve , reject ) => {
@@ -89,7 +108,7 @@ class GameContainer extends React.Component{
 
 			gameService.joinGame(gameID , obj).then( (response) => {
 				if(response.status === 1){
-					return reject(new Error(response.message));
+					return reject(response.message);
 				}else{
 					return resolve(response.gameObj);
 				}
@@ -103,12 +122,12 @@ class GameContainer extends React.Component{
 		return new Promise((resolve , reject ) => {
 			var obj = {
 					player1 : 'player one',
-					gameState : this.state.gameState
+					gameState : this.state
 				};
 
 			gameService.startNewGame(gameID , obj).then( (response) => {
 				if(response.status === 1){
-					return reject(new Error(response.message));
+					return reject(response.message);
 				}else{
 					return resolve(response.gameObj);
 				}
@@ -123,44 +142,53 @@ class GameContainer extends React.Component{
 
 
 	handleJoinedGame(gameObj){
-		this.setState({
-			paused : false,
-			started : true
-		});
+		this.userPlayer = 'playerTwo';
 		utils.saveToLocalStorage(this.state.gameID , 'true');
+		socketService.emitSocketEvent(this.socket , 'secondPlayerJoined' , this.state);
 		toast.success("joined game start playing");
 	}
 
 	handleNewGame(gameObj){
+		this.userPlayer = 'playerOne';
 		utils.saveToLocalStorage(this.state.gameID , 'true');
+		this.setState({
+			waiting : true
+		});
 		toast.success("waiting for opponent");
+		socketService.emitSocketEvent(this.socket , 'firstPlayerJoined' , this.state);
+
+	}
+
+
+	componentDidUpdate(prevProps, prevState){
+		if(prevState.currentPlayer !== this.state.currentPlayer || prevState.isFinished !== this.state.isFinished){
+			socketService.emitSocketEvent(this.socket , 'playMove' , this.state );
+		}
 	}
 
 
 	componentDidMount(){
 		var gameID = this.getGameID();
-		utils.getFromLocalStorage(gameID).then((value) => {
-			if(value){
-				toast.error("You have already joined the game");
-			}else{
-				toast.success("Starting game");
-				this.checkIfGameExistInServer(gameID).then((game)=> {
-					if(game){
-						this.joinExistingGame(gameID).then(this.handleJoinedGame);
-					}else{
-						this.startNewGameSession(gameID).then(this.handleNewGame);
-					}
-				})
-			}
+		
 
+		this.checkIfGameExistInServer(gameID).then((game)=> {
+		
+			if(game){
+				return this.joinExistingGame(gameID).then(this.handleJoinedGame);
+			}else{
+				return this.startNewGameSession(gameID).then(this.handleNewGame);
+			}
+			
 		}).catch((error)=> {
 			gameHelpers.showErrorMessage(error);
 		});
+
+		this.initSocketEventListners();
 	}
 
 
 
-	/*old code*/
+// 	/*/*old code*/
 
 
 
@@ -181,66 +209,69 @@ class GameContainer extends React.Component{
 		setTimeout(function(){
 			this.setState({
 				square : [[null,null,null],[null,null,null],[null,null,null]],
-				gameState : "game-to-start",
 				isFinished : false,
 				isTied : false,
 				winner : '',
 				winSquares : null,
-				isAICalculating : false
+				pauseUserInteraction : false,
+				started : true,
+				paused : false,
+				waiting : false,
+				currentPlayer : 'playerOne'
 			});
 
 		}.bind(this) , 3000 );
 	}
 
 
-	/*
-	*Function to play computers part
-	*/
-	playComputerPart(){
-		var square,
-		result,
-		nextMove;
+	// /*
+	// *Function to play computers part
+	// */
+	// playComputerPart(){
+	// 	var square,
+	// 	result,
+	// 	nextMove;
 		
-		square = this.state.square.clone2DArray();
+	// 	square = this.state.square.clone2DArray();
 		
-		nextMove = calculateNextMove(square , this.state.playerTwoSymbol );
+	// 	nextMove = calculateNextMove(square , this.state.playerTwoSymbol );
 		
 
-		square[nextMove[0]][nextMove[1]] =  this.state.currentSymbol;
-		result = calculateWinner(square);
-		//console.log('c',result);
+	// 	square[nextMove[0]][nextMove[1]] =  this.state.currentSymbol;
+	// 	result = calculateWinner(square);
+	// 	//console.log('c',result);
 
-		//if game is tied return
-		if(result.isFinished && result.isTied){
-			this.setState({
-				square :square,
-				isTied : true,
-				isFinished : true
-			});
+	// 	//if game is tied return
+	// 	if(result.isFinished && result.isTied){
+	// 		this.setState({
+	// 			square :square,
+	// 			isTied : true,
+	// 			isFinished : true
+	// 		});
 
-			this.startNewGame();
-			return;
-		}
+	// 		this.startNewGame();
+	// 		return;
+	// 	}
 
-		if(result.isFinished){
-			this.handleGameFinish(square , result );
-		}else{
-			this.setState({
-				isAICalculating : false,
-				square : square,
-				currentSymbol : (this.state.currentSymbol==="X") ? "0" : "X",
-				currentPlayer : this.state.currentPlayer === "playerOne" ? "playerTwo" : "playerOne"
-			});
+	// 	if(result.isFinished){
+	// 		this.handleGameFinish(square , result );
+	// 	}else{
+	// 		this.setState({
+	// 			isAICalculating : false,
+	// 			square : square,
+	// 			currentSymbol : (this.state.currentSymbol==="X") ? "0" : "X",
+	// 			currentPlayer : this.state.currentPlayer === "playerOne" ? "playerTwo" : "playerOne"
+	// 		});
 
-		}
-	}
+	// 	}
+	// }
+
 
 	/*
 	*Function to handle game 
 	*/
 	handleGameFinish(square , result ){
 		this.setState({
-			gameState : "finished",
 			isFinished : true,
 			winner : this.findWinner(result.winSymbol),
 			playerOneScore : this.findWinner(result.winSymbol)==='playerOne' ? this.state.playerOneScore + 1 : this.state.playerOneScore,
@@ -252,37 +283,20 @@ class GameContainer extends React.Component{
 		this.startNewGame();
 	}
 
-	/*
-	*handle reset btn click
-	*/
-	handleResetClick(){
-		this.setState({
-			square : [[null,null,null],[null,null,null],[null,null,null]],
-			currentSymbol : "",
-			gameState : "select-game-type",
-			isFinished : false,
-			isTied : false,
-			playerOneSymbol : "",
-			playerTwoSymbol : "",
-			playerOneScore : 0,
-			playerTwoScore : 0,
-			gameType : '',
-			currentPlayer : '',
-			winner : '',
-			winSquares : null
 
-		});
-	}
+
+
 
 	/*
 	* Handle click on square
 	*/
 	handleSquareClick(i,j){
 		var square,
-		result;
+		result,
+		gameState;
 		square = this.state.square.clone2DArray();
 
-		if(square[i][j]){
+		if(square[i][j] || this.state.currentPlayer !== this.userPlayer ){
 			return ;
 		}
 
@@ -292,113 +306,30 @@ class GameContainer extends React.Component{
 		
 		//if game is tied return
 		if(result.isFinished && result.isTied){
+
 			this.setState({
 				square : square,
 				isTied : true,
 				isFinished : true
 			});
-
 			this.startNewGame();
 			return;
 		}
 		
 		if(result.isFinished){
-
 			this.handleGameFinish(square , result );
-
 		}else{
+
 			this.setState({
 				square : square,
 				currentSymbol : (this.state.currentSymbol==="X") ? "0" : "X",
 				currentPlayer : this.state.currentPlayer === "playerOne" ? "playerTwo" : "playerOne"
 			});
 
-			if(this.state.gameState==="game-is-on" && this.state.gameType==="computer" && !this.state.isFinished && !this.state.isTied){			
-				this.setState({
-					isAICalculating :  true
-				});
-				setTimeout(function(){
-					this.playComputerPart();
-				}.bind(this) , 200);
-			}
 
 		}
 		
 	}
-
-
-	// componentDidUpdate(prevProps, prevState) {
-	// 	if(this.state.gameState==="game-is-on" && this.state.gameType==="computer" && this.state.currentPlayer==="playerTwo" && !this.state.isFinished && !this.state.isTied){			
-	// 		setTimeout(function(){
-	// 			this.playComputerPart();
-	// 		}.bind(this) , 200);
-	// 	}
-	// }
-
-
-	/*
-	* Handle game type select
-	*/
-	handleGameTypeSelect(type){
-		if(type==='computer'){
-			this.setState({
-				gameState : "select-game-symbol",
-				gameType : 'computer'
-			});
-		}else if(type==='player'){
-			this.setState({
-				gameState : "select-game-symbol",
-				gameType : 'player'
-			});
-		}
-	}
-
-
-	/*
-	* Handle game  symbol select
-	*/
-	handleGameSymbolSelect(symbol){
-		if(symbol==="X"){
-			
-			this.setState({
-				gameState : "game-to-start",
-				playerOneSymbol : "X",
-				playerTwoSymbol : "0",
-			});
-
-		}else if(symbol==="0"){
-			
-			this.setState({
-				gameState : "game-to-start",
-				playerOneSymbol : "0",
-				playerTwoSymbol : "X",
-			});
-		}
-	}
-
-
-	/*
-	* handle fisrt turn select
-	*/
-	handleFirstTurnSelect(player){
-		this.setState({
-			gameState : "game-is-on",
-			currentPlayer : player,
-			currentSymbol : player==='playerOne' ? this.state.playerOneSymbol : this.state.playerTwoSymbol
-		});
-
-
-		if(this.state.gameType==="computer" && player==="playerTwo" && !this.state.isFinished && !this.state.isTied){			
-			this.setState({
-				isAICalculating :  true
-			});
-			setTimeout(function(){
-				this.playComputerPart();
-			}.bind(this) , 400);
-		}
-	}
-	
-
 
 
 	render(){
@@ -407,24 +338,31 @@ class GameContainer extends React.Component{
 		var displayedComponents;
 
 		
+		
+
 
 			
 		displayedComponents = ( 
 				<Game 
-				playerOneScore={this.state.gameState.playerOneScore}
-				playerTwoScore={this.state.gameState.playerTwoScore}
-				isFinished={this.state.gameState.isFinished}
-				isTied={this.state.gameState.isTied}
-				winSquares={this.state.gameState.winSquares}
-				winner={this.state.gameState.winner}
-				square={this.state.gameState.square}
+				playerOneScore={this.state.playerOneScore}
+				playerTwoScore={this.state.playerTwoScore}
+				isFinished={this.state.isFinished}
+				isTied={this.state.isTied}
+				winSquares={this.state.winSquares}
+				winner={this.state.winner}
+				square={this.state.square}
 				onSquareClick={this.handleSquareClick}
-				gameType={this.state.gameState.gameType}
-				currentPlayer={this.state.gameState.currentPlayer}
-				isAICalculating={this.state.gameState.isAICalculating}
-				handleResetClick={this.handleResetClick}
+				currentPlayer={this.state.currentPlayer}
+				pauseUserInteraction={( this.state.currentPlayer === this.userPlayer ? false : true ) }
+				paused={this.state.paused}
+				waiting={this.state.waiting}
+				userPlayer={this.userPlayer}
+				playerOneSymbol={this.state.playerOneSymbol}
+				playerTwoSymbol={this.state.playerTwoSymbol}
 				/>
 				);
+
+	
 		
 
 		return (

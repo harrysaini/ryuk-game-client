@@ -32,7 +32,7 @@ export class Board extends Component{
 						);
 				}
 			}else{
-				if(this.props.square[i][j] || this.props.isAICalculating){
+				if(this.props.square[i][j] || this.props.pauseUserInteraction){
 					squareJSX = (
 						<Square 
 						isFilled={ this.props.square[i][j] ? true : false}
